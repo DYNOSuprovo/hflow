@@ -597,6 +597,15 @@ def write_canonical_episode(
     # check on a pass that was already happening rather than adding one.
     reader = open_reader(source_path, validate_crcs=True)
     try:
+        seen_metadata_names: set[str] = set()
+        for record in reader.iter_metadata():
+            if record.name in seen_metadata_names:
+                raise SourceNotConforming(
+                    f"duplicate metadata record {record.name!r} in source; "
+                    "canonical episodes require unique metadata record names"
+                )
+            seen_metadata_names.add(record.name)
+
         # First-party direct-H.264 imports commit quality/GOP at import time.
         # Never silently accept incompatible transform requests or introduce
         # another lossy generation. Ordinary recorded H.264 remains pass-through.

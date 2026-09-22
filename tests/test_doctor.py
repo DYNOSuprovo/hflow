@@ -702,3 +702,32 @@ def test_descending_without_map_is_clean(tmp_path: Path) -> None:
     report = diagnose(path)
     codes = {finding.code for finding in report.findings}
     assert "group-chunks-out-of-order" not in codes
+
+
+def test_duplicate_metadata_record_is_reported_by_doctor(tmp_path: Path) -> None:
+    path = tmp_path / "duplicate_metadata.mcap"
+    with path.open("wb") as stream:
+        writer = StockWriter(stream)
+        writer.start(profile="", library="test")
+        schema_id = writer.register_schema(name="dummy", encoding="json", data=b"{}")
+        channel_id = writer.register_channel(
+            topic="/state", message_encoding="json", schema_id=schema_id
+        )
+        writer.add_message(channel_id, log_time=10**9, data=b"{}", publish_time=10**9)
+        writer.add_metadata("episode/v1", {"task": "first", "success": "false"})
+        writer.add_metadata("episode/v1", {"task": "second", "success": "true"})
+        writer.add_metadata(
+            "provenance/v1",
+            {"schema_version": "1", "pipeline_version": "1"},
+        )
+        writer.finish()
+
+    report = diagnose(path)
+
+    assert not report.conforming
+    codes = {finding.code for finding in report.findings}
+    assert "duplicate-metadata" in codes
+    dup_finding = next(f for f in report.findings if f.code == "duplicate-metadata")
+    assert dup_finding.level is DiagnosticLevel.ERROR
+    assert "episode/v1" in dup_finding.message
+    assert "2 occurrences" in dup_finding.message

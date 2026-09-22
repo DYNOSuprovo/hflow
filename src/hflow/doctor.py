@@ -250,7 +250,21 @@ def diagnose(path: Path | str) -> DoctorReport:
             if schema_name in PASSTHROUGH_VIDEO_SCHEMA_NAMES
         }
 
-        metadata_records = {record.name: dict(record.metadata) for record in reader.iter_metadata()}
+        metadata_records: dict[str, dict[str, str]] = {}
+        metadata_name_counts: dict[str, int] = {}
+        for record in reader.iter_metadata():
+            metadata_name_counts[record.name] = metadata_name_counts.get(record.name, 0) + 1
+            metadata_records[record.name] = dict(record.metadata)
+
+        for record_name, count in sorted(metadata_name_counts.items()):
+            if count > 1:
+                collector.add(
+                    DiagnosticLevel.ERROR,
+                    "duplicate-metadata",
+                    f"duplicate metadata record {record_name!r} ({count} occurrences); "
+                    "convention requires unique metadata record names",
+                )
+
         provenance = metadata_records.get(METADATA_RECORD_PROVENANCE)
 
         def _positive_finite_seconds(raw_value: str) -> float | None:
