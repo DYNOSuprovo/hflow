@@ -33,11 +33,7 @@ rather than a consistency problem:
 """
 
 import errno
-
-try:
-    import fcntl
-except ImportError:
-    fcntl = None  # type: ignore[assignment]
+import fcntl
 import hashlib
 import logging
 import os
@@ -219,13 +215,11 @@ def _mirror_entry_lock(entry_file: Path) -> Iterator[None]:
     lock_file = entry_file.with_name(entry_file.name + ".mirror-lock")
     lock_file.parent.mkdir(parents=True, exist_ok=True)
     with lock_file.open("a") as lock_stream:
-        if fcntl is not None:
-            fcntl.flock(lock_stream, fcntl.LOCK_EX)
+        fcntl.flock(lock_stream, fcntl.LOCK_EX)
         try:
             yield
         finally:
-            if fcntl is not None:
-                fcntl.flock(lock_stream, fcntl.LOCK_UN)
+            fcntl.flock(lock_stream, fcntl.LOCK_UN)
 
 
 def _write_local_bytes_atomically(destination: Path, data: bytes) -> None:
